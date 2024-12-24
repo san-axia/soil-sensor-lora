@@ -2,7 +2,8 @@ import socket
 import threading
 import soil_data_parse as parser
 # import time
-import mqtt_lib as mqtt
+# import mqtt_lib as mqtt
+import mqtt_lib_gcp as mqtt
 
 def thread_excepthook(args):
     print(f"Unhandled exception in thread {args.thread.name}: {args.exc_type}, {args.exc_value}")
@@ -38,7 +39,8 @@ def handle_client(client_socket,client_address,broker_client):
                             print(c_data)
                         # send data
                         for item in c_data:
-                            mqtt.send_data(client=broker_client,topic=mqtt.topic+'\data',data=item)
+                            # mqtt.send_data(client=broker_client,topic=mqtt.topic+'\data',data=item)
+                            mqtt.send_data(broker_client,topic=mqtt.topic_name,data=item)
 
                     except ConnectionResetError:
                         with lock:
@@ -60,8 +62,11 @@ def start_server(host='0.0.0.0', port=8100):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    broker_client = mqtt.init_broker_client()
-
+    # broker_client = mqtt.init_broker_client()
+    publisher = mqtt.init_gcp()
+    if publisher is None:
+        print('MQTT client initialization error')
+        exit(1)
     try:
         # Bind and listen on the specified host and port
         server_socket.bind((host, port))
@@ -78,7 +83,7 @@ def start_server(host='0.0.0.0', port=8100):
                 # Start a new thread for each client
                 # lock.acquire()
                 client_thread = threading.Thread(target=handle_client, 
-                                                 args=(client_socket,client_address,broker_client), 
+                                                 args=(client_socket,client_address,publisher), 
                                                  daemon=True)
                 client_thread.start()
                 print(f"After thread: Socket fileno for {client_address} is {client_socket.fileno()}")
@@ -88,14 +93,14 @@ def start_server(host='0.0.0.0', port=8100):
                 print(f"Error handling client: {e}")
     except KeyboardInterrupt:
         server_socket.close()
-        mqtt.disconnect(broker_client=broker_client)
+        # mqtt.disconnect(broker_client=broker_client)
         print("\nKeyboard interrupt received. Shutting down the server.")
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
         # Ensure the server socket is closed in any case
         server_socket.close()
-        mqtt.disconnect(broker_client=broker_client)
+        # mqtt.disconnect(broker_client=broker_client)
         print("Socket closed. Server stopped.")
 
 # Start the server
