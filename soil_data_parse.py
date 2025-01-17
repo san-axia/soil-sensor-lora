@@ -1,14 +1,15 @@
 from datetime import datetime, timezone
 # Input Hex Data and Segment Lengths
-# hex_data = (
-#     "fedc016772c91a96390000000d030020000000000000011c000000fa0000004a00000066000000cf000003100000041e00"
-# fedc016f8be929963c0000000a0300100000011a00000001000002bc0000000000
-# )
+# With NPK -  "fedc016772c91a96390000000d030020000000000000011c000000fa0000004a00000066000000cf000003100000041e00"
+# NO-NPK - fedc016f8be929963c0000000a0300100000011a00000001000002bc0000000000
+# UV - fedc012b6768622b64000000010300040000000000
+# 
 # fedc 01 6f8be929963c 0000000a 03 0010 0000011a 00000001 000002bc 00000000 00
+# fedc 01 2b6768622b64 00000001 03 0004 00000000 00
 
-hex_data = 'fedc016772c91a963900000005030020000000000000012200000000000000000000000000000000000002bc0000000000fedc012e3f'
 
-labels = ['device_id','session_id','moisture','temperature','conductivity','ph','n','p','k','salinity','dissolved_solids_tds','dateutc']
+
+labels = ['device_id','session_id','moisture','temperature','conductivity','ph','n','p','k','salinity','dissolved_solids_tds','dateutc','uv']
 header = bytes.fromhex('fedc')
 byte_segment = {
     # 'header':2, 
@@ -52,6 +53,7 @@ def segment_binary_data(binary_data, byte_segment):
     segments = {}
     # Validate essential length
     head_length = 5
+    single_data_length = 4
     essentil_length = sum(list(byte_segment.values())[:head_length]) + byte_segment['crc']
     total_length = sum(byte_segment.values())
     b_length = len(binary_data)
@@ -68,7 +70,7 @@ def segment_binary_data(binary_data, byte_segment):
     for key in list(byte_segment.keys())[:head_length]:
         end = start + byte_segment[key]
         value = binary_data[start:end]
-        segments[key]=value.hex()
+        segments[key]=value
         start = end
     
     #optional reg. status
@@ -76,17 +78,27 @@ def segment_binary_data(binary_data, byte_segment):
         key = 'registration_status'
         end = start + byte_segment[key]
         value = binary_data[start:end]
-        segments[key]=value.hex()
+        segments[key]=value
         start = end
 
     # remove the tail (CRC)
     end = b_length
     start = end - byte_segment['crc']
     value = binary_data[start:end]
-    segments['crc']=value.hex()
-
+    segments['crc']=value
+    
     start = sum(list(byte_segment.values())[:head_length])
     print (start)
+    
+    # check UV sensor
+    d_length = b_length-start-byte_segment['crc']
+    if d_length==single_data_length:
+        end = start + single_data_length
+        value = binary_data[start:end]
+        segments['uv'] = value
+        return segments
+
+    # soil data (with or without NPK)    
     for key in list(byte_segment.keys())[(head_length+1):-1]:
         # skip NPK
         if (b_length < total_length) & (key in ['n','p','k']):
@@ -96,7 +108,7 @@ def segment_binary_data(binary_data, byte_segment):
             if end>b_length:
                 break
             value = binary_data[start:end]
-            segments[key]=value.hex()
+            segments[key]=value
             start = end
 
     return segments
@@ -108,7 +120,7 @@ def parse_data(binary_data,byte_segment=byte_segment):
         segments = segment_binary_data(binary_data, byte_segment)
         if segments:
             for key in segments:
-                if key in ['temperature','moisture','n','p','k','ph','conductivity']:
+                if key in ['temperature','moisture','n','p','k','ph','conductivity','uv']:
                     if key == 'temperature':
                         # print(f"{key} : {int.from_bytes(segments[key], byteorder='big',signed=True)/10}")
                         data[key] = int.from_bytes(segments[key], byteorder='big',signed=True)/10
@@ -140,8 +152,8 @@ def cleaned_data (data):
                 clean_data[label] = data[label]
             elif label == 'dateutc':
                 clean_data[label] = str(datetime.now(timezone.utc))
-            else:
-                clean_data[label] = 0
+            # else:
+            #     clean_data[label] = 0
     else:
         return None
     return clean_data
@@ -159,6 +171,9 @@ def auto_parse(binary_data):
 
 
 # Test code
+# hex_data = 'fedc016772c91a963900000005030020000000000000012200000000000000000000000000000000000002bc0000000000fedc012e3f'
+# hex_data = 'fedc016f8be929963c0000000a0300100000011a00000001000002bc0000000000'
+# hex_data = 'fedc012b6768622b64000000010300040000000000'
 # Convert hex string to bytes
 # binary_data = bytes.fromhex(hex_data)
 # print(binary_data)

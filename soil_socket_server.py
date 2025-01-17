@@ -41,6 +41,8 @@ def handle_client(client_socket,client_address,broker_client):
                         for item in c_data:
                             # mqtt.send_data(client=broker_client,topic=mqtt.topic+'\data',data=item)
                             mqtt.send_data(broker_client,topic=mqtt.topic_name,data=item)
+                            # with lock:
+                            #     print(item)
 
                     except ConnectionResetError:
                         with lock:

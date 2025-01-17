@@ -9,7 +9,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 # GCP Pub/Sub setting
 project_id = 'goldfarm-88888888'
 topic = 'soildata'
-publisher_file = "../soil-sensor-test/publisher.json"
+publisher_file = "../soil-testing/publisher.json"
 topic_name = ''
 
 def send_data(publisher,topic,data):
