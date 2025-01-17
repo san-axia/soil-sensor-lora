@@ -2,7 +2,10 @@ from datetime import datetime, timezone
 # Input Hex Data and Segment Lengths
 # hex_data = (
 #     "fedc016772c91a96390000000d030020000000000000011c000000fa0000004a00000066000000cf000003100000041e00"
+# fedc016f8be929963c0000000a0300100000011a00000001000002bc0000000000
 # )
+# fedc 01 6f8be929963c 0000000a 03 0010 0000011a 00000001 000002bc 00000000 00
+
 hex_data = 'fedc016772c91a963900000005030020000000000000012200000000000000000000000000000000000002bc0000000000fedc012e3f'
 
 labels = ['device_id','session_id','moisture','temperature','conductivity','ph','n','p','k','salinity','dissolved_solids_tds','dateutc']
@@ -24,22 +27,77 @@ byte_segment = {
     'conductivity': 4,
     'crc': 1}  # Lengths in bytes
 
+# def segment_binary_data(binary_data, byte_segment):
+
+#     # Segment data
+#     segments = {}
+#     # Validate essential length
+#     total_length = sum(byte_segment.values())
+#     if len(binary_data) != total_length:
+#         # print(binary_data)
+#         print(f"Data length mismatch: Expected {total_length} bytes, got {len(binary_data)} bytes")
+#         return None
+    
+#     start = 0
+#     for key in byte_segment:
+#         end = start + byte_segment[key]
+#         value = binary_data[start:end]
+#         segments[key]=value
+#         start = end
+
+#     return segments
 def segment_binary_data(binary_data, byte_segment):
 
     # Segment data
     segments = {}
-    # Validate total length
+    # Validate essential length
+    head_length = 5
+    essentil_length = sum(list(byte_segment.values())[:head_length]) + byte_segment['crc']
     total_length = sum(byte_segment.values())
-    if len(binary_data) != total_length:
-        print(f"Data length mismatch: Expected {total_length} bytes, got {len(binary_data)} bytes")
+    b_length = len(binary_data)
+
+    data_length = b_length - essentil_length
+    if (data_length>0) & ((data_length%4)==0):
+        print('Valid Data - ',binary_data.hex())
+    else:
+        print('Invalid Data - ',binary_data.hex())
         return None
-    
+
+    # remove the essential headers
     start = 0
-    for key in byte_segment:
+    for key in list(byte_segment.keys())[:head_length]:
         end = start + byte_segment[key]
         value = binary_data[start:end]
-        segments[key]=value
+        segments[key]=value.hex()
         start = end
+    
+    #optional reg. status
+    if b_length==total_length:
+        key = 'registration_status'
+        end = start + byte_segment[key]
+        value = binary_data[start:end]
+        segments[key]=value.hex()
+        start = end
+
+    # remove the tail (CRC)
+    end = b_length
+    start = end - byte_segment['crc']
+    value = binary_data[start:end]
+    segments['crc']=value.hex()
+
+    start = sum(list(byte_segment.values())[:head_length])
+    print (start)
+    for key in list(byte_segment.keys())[(head_length+1):-1]:
+        # skip NPK
+        if (b_length < total_length) & (key in ['n','p','k']):
+            pass
+        else:
+            end = start + byte_segment[key]
+            if end>b_length:
+                break
+            value = binary_data[start:end]
+            segments[key]=value.hex()
+            start = end
 
     return segments
 
