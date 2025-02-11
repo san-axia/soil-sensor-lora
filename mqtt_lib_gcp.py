@@ -13,10 +13,20 @@ publisher_file = "../soil-testing/publisher.json"
 topic_name = ''
 
 def send_data(publisher,topic,data):
-    data_byte = json.dumps(data).encode('utf-8')
-    future = publisher.publish(topic, data_byte)
-    print(future.result())
-    return future.result()
+    result = None
+    try:
+        data_byte = json.dumps(data).encode('utf-8')
+        future = publisher.publish(topic, data_byte)
+        result = future.result()
+        print(result)
+        return result
+    # if time out exception, re-initialize connection
+    
+    except Exception as e:
+        print('Error in GCP Pub/Sub Sending Data')
+        print(e)
+        return result
+    
 
 def init_gcp(publisher_file=publisher_file,project_id=project_id,topic=topic):
     try:
